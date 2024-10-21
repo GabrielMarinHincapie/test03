@@ -19,6 +19,7 @@ async function activateXR() {
     document.body.appendChild(canvas);
     const gl = canvas.getContext("webgl", {xrCompatible: true});
 
+    // Setup the scene
     const scene = new THREE.Scene();
 
     // Add lighting
@@ -28,21 +29,51 @@ async function activateXR() {
     directionalLight.position.set(1, 1, 1).normalize();
     scene.add(directionalLight);
 
-    // Load the GLTF model
+    // Create a single GLTFLoader instance
     const loader = new THREE.GLTFLoader();
+
     let reticle;
     loader.load("https://immersive-web.github.io/webxr-samples/media/gltf/reticle/reticle.gltf", (gltf) => {
       reticle = gltf.scene;
       reticle.visible = false;
       scene.add(reticle);
+    }, undefined, (error) => {
+      console.error("Failed to load the reticle model:", error);
     });
 
-    let flower;
-    loader.load("https://immersive-web.github.io/webxr-samples/media/gltf/sunflower/sunflower.gltf", (gltf) => {
-      flower = gltf.scene;
-    });
+    // Function to load a GLTF model
+    function loadModel(url) {
+      return new Promise((resolve, reject) => {
+        loader.load(url, (gltf) => {
+          resolve(gltf.scene);
+        }, undefined, (error) => {
+          reject(error);
+        });
+      });
+    }
 
-    // Set up renderer
+    // Array of model URLs
+    const modelUrls = [
+      "https://gabrielmarinhincapie.github.io/test03/main/polycam01.glb",
+      "https://gabrielmarinhincapie.github.io/test03/main/polycam02.glb",
+      "https://gabrielmarinhincapie.github.io/test03/main/polycam03.glb",
+      "https://gabrielmarinhincapie.github.io/test03/main/polycam04.glb"
+    ];
+
+    // Array to store loaded models
+    let loadedModels = [];
+
+    // Load all models and add them to the loadedModels array
+    Promise.all(modelUrls.map(loadModel))
+      .then(models => {
+        loadedModels = models; // Store the loaded models
+        console.log("All models have been loaded.");
+      })
+      .catch(error => {
+        console.error("An error occurred while loading the models:", error);
+      });
+
+    // Setup renderer
     const renderer = new THREE.WebGLRenderer({
       alpha: true,
       preserveDrawingBuffer: false,
@@ -59,28 +90,32 @@ async function activateXR() {
     const session = await navigator.xr.requestSession("immersive-ar", {requiredFeatures: ['hit-test']});
     session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
 
-    // Set up reference spaces
+    // Setup reference spaces
     const referenceSpace = await session.requestReferenceSpace('local');
     const viewerSpace = await session.requestReferenceSpace('viewer');
     const hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
 
-    // Event listener for model placement
+    // Handle user input for model placement
     session.addEventListener("select", () => {
-      if (flower && reticle.visible) {
-        const clone = flower.clone();
-        clone.position.copy(reticle.position);
-        scene.add(clone);
+      if (loadedModels.length > 0 && reticle.visible) {
+        // Select a random model from the loaded models
+        const randomIndex = Math.floor(Math.random() * loadedModels.length);
+        const randomModel = loadedModels[randomIndex].clone();
+
+        // Set the model position to the reticle's position
+        randomModel.position.copy(reticle.position);
+        scene.add(randomModel);
       }
     });
 
-    // Render loop
+    // WebXR frame rendering loop
     const onXRFrame = (time, frame) => {
       session.requestAnimationFrame(onXRFrame);
 
-      // Bind framebuffer
+      // Bind the framebuffer
       gl.bindFramebuffer(gl.FRAMEBUFFER, session.renderState.baseLayer.framebuffer);
 
-      // Get device pose
+      // Get the device pose
       const pose = frame.getViewerPose(referenceSpace);
       if (pose) {
         const view = pose.views[0];
@@ -108,9 +143,10 @@ async function activateXR() {
       }
     };
 
+    // Start the rendering loop
     session.requestAnimationFrame(onXRFrame);
   } catch (e) {
-    console.error("Failed to start AR session", e);
+    console.error("Failed to start AR session:", e);
   }
 }
 </script>
