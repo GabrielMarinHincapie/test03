@@ -39,29 +39,25 @@ async function activateXR() {
 
     // Load the GLTF model with the correct raw URL
     const loader = new THREE.GLTFLoader();
-    let reticle;
-    loader.load("https://immersive-web.github.io/webxr-samples/media/gltf/reticle/reticle.gltf", function(gltf) {
-      reticle = gltf.scene;
-      reticle.visible = false;
-      scene.add(reticle);
-        })  
+      let reticle;
+      loader.load("https://immersive-web.github.io/webxr-samples/media/gltf/reticle/reticle.gltf", function(gltf) {
+        reticle = gltf.scene;
+        reticle.visible = false;
+        scene.add(reticle);
+         })  
       
       let flower;
       loader.load("https://immersive-web.github.io/webxr-samples/media/gltf/sunflower/sunflower.gltf", function(gltf) {
         flower = gltf.scene;
       });
-
-
-
-    // The cube will have a different color on each side.
-    const materials = [
-      new THREE.MeshBasicMaterial({color: 0xff0000}),
-      new THREE.MeshBasicMaterial({color: 0x0000ff}),
-      new THREE.MeshBasicMaterial({color: 0x00ff00}),
-      new THREE.MeshBasicMaterial({color: 0xff00ff}),
-      new THREE.MeshBasicMaterial({color: 0x00ffff}),
-      new THREE.MeshBasicMaterial({color: 0xffff00})
-      ];
+      
+      session.addEventListener("select", (event) => {
+      if (flower) {
+        const clone = flower.clone();
+        clone.position.copy(reticle.position);
+        scene.add(clone);
+        }
+        });
 
 
 
@@ -81,32 +77,8 @@ async function activateXR() {
     }, undefined, (error) => {
       console.error('An error occurred while loading the model:', error);
     });
-    const cube = new THREE.Mesh(new THREE.BoxBufferGeometry(0.2, 0.2, 0.2), materials);
-    cube.position.set(1, 1, 1);
-    scene.add(cube);
-
-
-    // Create another XRReferenceSpace that has the viewer as the origin.
-    const viewerSpace = await session.requestReferenceSpace('viewer');
-    // Perform hit testing using the viewer as origin.
-    const hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
-
-    const hitTestResults = frame.getHitTestResults(hitTestSource);
-      if (hitTestResults.length > 0 && reticle) {
-        const hitPose = hitTestResults[0].getPose(referenceSpace);
-        reticle.visible = true;
-        reticle.position.set(hitPose.transform.position.x, hitPose.transform.position.y, hitPose.transform.position.z)
-        reticle.updateMatrixWorld(true);
-          }
-
-    session.addEventListener("select", (event) => {
-      if (flower) {
-        const clone = flower.clone();
-        clone.position.copy(reticle.position);
-        scene.add(clone);
-        }
-        
-});
+   
+    
     // Set up renderer
     const renderer = new THREE.WebGLRenderer({
       alpha: true,
@@ -118,11 +90,18 @@ async function activateXR() {
 
 
 
-    // Create a camera
+    // Create a camera =====================================================================CAMERA
+    
     const camera = new THREE.PerspectiveCamera();
     camera.matrixAutoUpdate = false;
 
-
+    const hitTestResults = frame.getHitTestResults(hitTestSource);
+    if (hitTestResults.length > 0 && reticle) {
+      const hitPose = hitTestResults[0].getPose(referenceSpace);
+      reticle.visible = true;
+      reticle.position.set(hitPose.transform.position.x, hitPose.transform.position.y, hitPose.transform.position.z)
+      reticle.updateMatrixWorld(true);
+}
 
     // Start the WebXR session
     const session = await navigator.xr.requestSession("immersive-ar", {requiredFeatures: ['hit-test']});
@@ -135,7 +114,10 @@ async function activateXR() {
     // Set up reference space
     const referenceSpace = await session.requestReferenceSpace('local');
 
-
+      // Create another XRReferenceSpace that has the viewer as the origin.
+    const viewerSpace = await session.requestReferenceSpace('viewer');
+      // Perform hit testing using the viewer as origin.
+    const hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
 
     // Render loop
     const onXRFrame = (time, frame) => {
